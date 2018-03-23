@@ -1,0 +1,11 @@
+*.swp
+.nct7491.ko.cmd
+.nct7491.mod.o.cmd
+.nct7491.o.cmd
+.tmp_versions/
+Module.symvers
+modules.order
+nct7491.ko
+nct7491.mod.c
+nct7491.mod.o
+nct7491.o
