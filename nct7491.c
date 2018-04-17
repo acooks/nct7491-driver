@@ -2028,6 +2028,50 @@ static void config_therm_sources(struct i2c_client *client,
 	write_therm_config(client, priv->therm_sources);
 }
 
+enum acpi_therm_limit {
+	THERM_LIMIT_REMOTE1 = 0,
+	THERM_LIMIT_LOCAL,
+	THERM_LIMIT_REMOTE2,
+	THERM_LIMIT_PUSH,
+	THERM_LIMIT_SMBUS
+};
+
+static const char *acpi_therm_limits[] = {
+	[THERM_LIMIT_REMOTE1] = "therm-limit-remote1",
+	[THERM_LIMIT_LOCAL] = "therm-limit-local",
+	[THERM_LIMIT_REMOTE2] = "therm-limit-remote2",
+	[THERM_LIMIT_PUSH] = "therm-limit-push",
+	[THERM_LIMIT_SMBUS] = "therm-limit-smbus"
+};
+
+static void config_therm_limits(struct i2c_client *client,
+				struct nct7491_data *priv)
+{
+	int i, ret;
+	u8 therm_limit;
+
+	for (i = THERM_LIMIT_REMOTE1; i <= THERM_LIMIT_REMOTE2; i++) {
+		ret = device_property_read_u8_array(&client->dev,
+						    acpi_therm_limits[i],
+						    &therm_limit, 1);
+		if (ret)
+			therm_limit = 100; /* power on default is 100 */
+
+		priv->temp[THERM][i] = therm_limit;
+		i2c_smbus_write_byte_data(client, TEMP_THERM_REG(i),
+					  therm_limit);
+	}
+
+	ret = device_property_read_u8_array(&client->dev,
+					    acpi_therm_limits[THERM_LIMIT_SMBUS],
+					    &therm_limit, 1);
+	if (ret)
+		therm_limit = 100; /* power on default is 100 */
+
+	priv->smb_therm = therm_limit;
+	i2c_smbus_write_byte_data(client, REG_SMBUS_LIMIT_THERM, therm_limit);
+}
+
 /*
  * SMBUS_CONFIG5:7 switches between Intel PCH mode (default) and
  * non-Intel generic smbus mode.
@@ -2229,6 +2273,7 @@ static int nct7491_chip_init(struct i2c_client *client,
 	config_format_offset_range(client, priv);
 	config_tmin(client, priv);
 
+	config_therm_limits(client, priv);
 	config_therm_sources(client, priv);
 
 	config_smbus_pch_mode(client, priv);
