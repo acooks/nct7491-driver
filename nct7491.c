@@ -294,6 +294,16 @@ struct nct7491_data {
 	u8 therm_sources:5;
 };
 
+/* This is the order of struct nct7491_data.therm_sources bitmap. */
+static const char *acpi_therm_sources[] = {
+	"therm-enable-remote1",
+	"therm-enable-local",
+	"therm-enable-remote2",
+	"therm-enable-push",
+	"therm-enable-smbus"
+};
+
+
 static struct i2c_driver nct7491_driver;
 static struct nct7491_data *nct7491_read_sensors(struct device *dev);
 static void nct7491_read_hystersis(struct i2c_client *client);
@@ -1188,15 +1198,15 @@ static void write_therm_config(struct i2c_client *client, u8 therm_sources)
 
 	config5 = nct7491_read(REG_CONFIG5);
 	config5 &= 0x1F;	/* clear bits 5,6,7 */
-	config5 |= (therm_sources & BIT(0)) ? BIT(5) : 0;
-	config5 |= (therm_sources & BIT(1)) ? BIT(6) : 0;
-	config5 |= (therm_sources & BIT(2)) ? BIT(7) : 0;
+	config5 |= (therm_sources & BIT(0)) ? BIT(5) : 0; /* remote 1 */
+	config5 |= (therm_sources & BIT(1)) ? BIT(6) : 0; /* local */
+	config5 |= (therm_sources & BIT(2)) ? BIT(7) : 0; /* remote 2 */
 	i2c_smbus_write_byte_data(client, REG_CONFIG5, config5);
 
 	therm_config1 = nct7491_read(REG_THERM_CONFIG1);
 	therm_config1 &= 0x9F;	/* clear bits 5,6 */
-	therm_config1 |= (therm_sources & BIT(3)) ? BIT(5) : 0;
-	therm_config1 |= (therm_sources & BIT(4)) ? BIT(6) : 0;
+	therm_config1 |= (therm_sources & BIT(3)) ? BIT(5) : 0; /* push */
+	therm_config1 |= (therm_sources & BIT(4)) ? BIT(6) : 0; /* smbus */
 	i2c_smbus_write_byte_data(client, REG_THERM_CONFIG1, therm_config1);
 }
 
@@ -1997,49 +2007,23 @@ static void config_tmin(struct i2c_client *client,
 	i2c_smbus_write_byte_data(client, REG_PUSH_TMIN, tmin);
 }
 
-/* FIXME: refactor? */
-static void config_therm(struct i2c_client *client,
-			 struct nct7491_data *priv)
+static void config_therm_sources(struct i2c_client *client,
+				 struct nct7491_data *priv)
 {
-	int ret;
+	int i, ret;
 	u8 therm_enabled;
 
 	priv->therm_sources = 0;
 
-	ret = device_property_read_u8_array(&client->dev, "therm-remote1",
-					    &therm_enabled, 1);
-	if (ret)
-		therm_enabled = 0;
+	for (i = 0; i < ARRAY_SIZE(acpi_therm_sources); i++) {
+		ret = device_property_read_u8_array(&client->dev,
+						    acpi_therm_sources[i],
+						    &therm_enabled, 1);
+		if (ret)
+			therm_enabled = 0;
 
-	priv->therm_sources |= (therm_enabled) ? BIT(0) : 0;
-
-	ret = device_property_read_u8_array(&client->dev, "therm-local",
-					    &therm_enabled, 1);
-	if (ret)
-		therm_enabled = 0;
-
-	priv->therm_sources |= (therm_enabled) ? BIT(1) : 0;
-
-	ret = device_property_read_u8_array(&client->dev, "therm-remote2",
-					    &therm_enabled, 1);
-	if (ret)
-		therm_enabled = 0;
-
-	priv->therm_sources |= (therm_enabled) ? BIT(2) : 0;
-
-	ret = device_property_read_u8_array(&client->dev, "therm-push",
-					    &therm_enabled, 1);
-	if (ret)
-		therm_enabled = 0;
-
-	priv->therm_sources |= (therm_enabled) ? BIT(3) : 0;
-
-	ret = device_property_read_u8_array(&client->dev, "therm-smbus",
-					    &therm_enabled, 1);
-	if (ret)
-		therm_enabled = 0;
-
-	priv->therm_sources |= (therm_enabled) ? BIT(4) : 0;
+		priv->therm_sources |= (therm_enabled) ? BIT(i) : 0;
+	}
 
 	write_therm_config(client, priv->therm_sources);
 }
@@ -2245,7 +2229,7 @@ static int nct7491_chip_init(struct i2c_client *client,
 	config_format_offset_range(client, priv);
 	config_tmin(client, priv);
 
-	config_therm(client, priv);
+	config_therm_sources(client, priv);
 
 	config_smbus_pch_mode(client, priv);
 	config_smbus_sensors(client, priv);
