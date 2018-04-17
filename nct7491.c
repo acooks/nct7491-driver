@@ -1220,11 +1220,11 @@ static ssize_t set_therm_sources(struct device *dev,
 
 	if (kstrtol(buf, 10, &val))
 		return -EINVAL;
-	if (val < 0 || val > 0x31)
+	if (val < 0 || val > 0x1f)
 		return -EINVAL;
 
 	mutex_lock(&data->lock);
-	data->therm_sources = val & 0x31; /*therm_sources is only 5 bits */
+	data->therm_sources = val & 0x1f; /* therm_sources is only 5 bits */
 	write_therm_config(client, data->therm_sources);
 	mutex_unlock(&data->lock);
 
