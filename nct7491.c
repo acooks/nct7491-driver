@@ -2301,8 +2301,14 @@ static int nct7491_probe(struct i2c_client *client,
 
 	struct nct7491_data *data;
 	int ret = 0, version, revision;
+	u8 vendid, devid;
 
 	dev_dbg(&client->dev, "%s", __func__);
+
+	vendid = nct7491_read(REG_VENDID);
+	devid = nct7491_read(REG_DEVID);
+	if (vendid != ONSEMI_VENDID || devid != NCT7491_DEVID)
+		return -ENODEV;
 
 	data = devm_kzalloc(&client->dev, sizeof(*data), GFP_KERNEL);
 	if (data == NULL)
